@@ -32,7 +32,10 @@ namespace TaskbarShortcuts
 
 		private Action<string> actionOnError = err => UserMessages.ShowErrorMessage(err);
 
+		private const string cResourceKeyName_Setting_MaxItemWidth = "cMaxItemWidth";
+
 		private readonly string filepathForApplicationList = SettingsInterop.GetFullFilePathInLocalAppdata("ListOfApplications.txt", cThisAppName);
+		private readonly string filePath_Setting_ItemMaxWidth = SettingsInterop.GetFullFilePathInLocalAppdata("ItemMaxWidth.txt", cThisAppName, "Settings");
 
 		ObservableCollection<ApplicationItem> listOfApps;
 
@@ -47,6 +50,25 @@ namespace TaskbarShortcuts
 		{
 			this.UpdateLayout();
 
+			//PositionWindowAtMouseCursor();
+
+			/*listboxApplications.ItemsSource = 
+				DuplicatedFromAutoUpdatedMainWindow_GetListOfInstalledApplications()
+				.Select(kv => new ApplicationItem(kv.Key, kv.Value));*/
+			LoadListOfApplications();
+
+			if (!this.LoadLastWindowPosition(cThisAppName))
+				LoadDefaultWindowSize();
+			LoadMaxItemWidthFromSettings();
+		}
+
+		private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
+		{
+			this.SaveLastWindowPosition(cThisAppName);
+		}
+
+		private void PositionWindowAtMouseCursor()
+		{
 			Win32Api.POINT mousePos;
 			if (!Win32Api.GetCursorPos(out mousePos))
 				return;
@@ -64,11 +86,47 @@ namespace TaskbarShortcuts
 			if (y < wa.Top) y = wa.Top;
 			if (y + this.Height > wa.Bottom) y = wa.Bottom - this.Height;
 			this.Top = y;
+		}
 
-			/*listboxApplications.ItemsSource = 
-				DuplicatedFromAutoUpdatedMainWindow_GetListOfInstalledApplications()
-				.Select(kv => new ApplicationItem(kv.Key, kv.Value));*/
-			LoadListOfApplications();
+		private void LoadDefaultWindowSize()
+		{
+			this.Width = 500.0;
+			this.Height = 300.0;
+		}
+
+		private void LoadMaxItemWidthFromSettings()
+		{
+			try
+			{
+				if (!File.Exists(filePath_Setting_ItemMaxWidth))
+				{
+					menuItemSetting_itemMaxWidth.Text = this.Resources[cResourceKeyName_Setting_MaxItemWidth].ToString();
+					return;
+				}
+
+				double tmpitemMaxwidth;
+				if (!double.TryParse(File.ReadAllText(filePath_Setting_ItemMaxWidth).Trim(), out tmpitemMaxwidth))
+					return;
+				this.Resources[cResourceKeyName_Setting_MaxItemWidth] = tmpitemMaxwidth;
+				menuItemSetting_itemMaxWidth.Text = tmpitemMaxwidth.ToString();
+			}
+			catch (Exception exc)
+			{
+				UserMessages.ShowWarningMessage("Unable to load item max width: " + exc.Message);
+			}
+		}
+
+		private void SaveMaxItemWidthToSettings()
+		{
+			try
+			{
+				double currentItemMaxWidth = (double)this.Resources[cResourceKeyName_Setting_MaxItemWidth];
+				File.WriteAllText(filePath_Setting_ItemMaxWidth, currentItemMaxWidth.ToString());
+			}
+			catch (Exception exc)
+			{
+				UserMessages.ShowWarningMessage("Unable to save item max width to settings: " + exc.Message);
+			}
 		}
 
 		private bool RightButtonDownWasUsedForDragMove = false;
@@ -78,6 +136,7 @@ namespace TaskbarShortcuts
 			{
 				if (Mouse.RightButton == MouseButtonState.Pressed)
 				{
+					e.Handled = true;
 					RightButtonDownWasUsedForDragMove = true;
 					this.DragMove();
 				}
@@ -97,7 +156,7 @@ namespace TaskbarShortcuts
 					RightButtonDownWasUsedForDragMove = false;
 					e.Handled = true;//We handle MouseRightButtonUp so we don't show the context menu after DragMove
 				}
-			}
+			}			
 		}
 
 		private void Window_MouseEnter(object sender, MouseEventArgs e)
@@ -122,7 +181,8 @@ namespace TaskbarShortcuts
 			}
 			listOfApps = tmplist;
 			listboxApplications.ItemsSource = listOfApps;
-			RepopulateAndRefreshJumpList();
+
+			//RepopulateAndRefreshJumpList();We cannot do this as we need the window.Handle to be created first
 		}
 
 		private void SaveListOfApplications()
@@ -395,6 +455,25 @@ namespace TaskbarShortcuts
 		private void menuitemExit_Click(object sender, RoutedEventArgs e)
 		{
 			this.Close();
+		}
+
+		private void menuItemSetting_itemMaxWidth_LostFocus(object sender, RoutedEventArgs e)
+		{
+			try
+			{
+				double newSetting = double.Parse(menuItemSetting_itemMaxWidth.Text);
+				double oldSetting = (double)this.Resources[cResourceKeyName_Setting_MaxItemWidth];
+				if (!newSetting.Equals(oldSetting))
+				{
+					this.Resources[cResourceKeyName_Setting_MaxItemWidth] = newSetting;
+					SaveMaxItemWidthToSettings();
+				}
+			}
+			catch (Exception exc)
+			{
+				UserMessages.ShowErrorMessage("Unable to set new item width: " + exc.Message);
+				menuItemSetting_itemMaxWidth.Text = this.Resources[cResourceKeyName_Setting_MaxItemWidth].ToString();
+			}
 		}
 	}
 
@@ -696,7 +775,7 @@ namespace TaskbarShortcuts
 			}
 
 			//sw.Stop();
-			//Console.WriteLine("Elapsed seconds = " + sw.Elapsed.TotalSeconds + ".");
+			//UserMessages.ShowInfoMessage("Elapsed seconds = " + sw.Elapsed.TotalSeconds + ".");
 		}
 
 		private static string GetIconFilepathForChromeAppId(string chromeAppId)
@@ -762,6 +841,7 @@ namespace TaskbarShortcuts
 
 		public void RunCommand()
 		{
+			Console.WriteLine("RunCommand()");
 			string expandedEnvironmentVariablesExePath = Environment.ExpandEnvironmentVariables(this.ApplicationExePath);
 			if (Directory.Exists(expandedEnvironmentVariablesExePath))
 				Process.Start("explorer", expandedEnvironmentVariablesExePath);
