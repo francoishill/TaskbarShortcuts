@@ -67,6 +67,9 @@
     <Reference Include="CookComputing.XmlRpcV2">
       <HintPath>..\..\..\..\..\..\..\Francois\Dev\DLLs\XmlRpc\CookComputing.XmlRpcV2.dll</HintPath>
     </Reference>
+    <Reference Include="GongSolutions.Wpf.DragDrop">
+      <HintPath>..\..\..\DLLs\WPFdragDrop\GongSolutions.Wpf.DragDrop.dll</HintPath>
+    </Reference>
     <Reference Include="Microsoft.Build" />
     <Reference Include="Microsoft.Build.Framework" />
     <Reference Include="Microsoft.WindowsAPICodePack.Shell">

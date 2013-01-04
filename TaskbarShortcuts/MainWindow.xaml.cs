@@ -156,7 +156,7 @@ namespace TaskbarShortcuts
 					RightButtonDownWasUsedForDragMove = false;
 					e.Handled = true;//We handle MouseRightButtonUp so we don't show the context menu after DragMove
 				}
-			}			
+			}
 		}
 
 		private void Window_MouseEnter(object sender, MouseEventArgs e)
@@ -181,6 +181,12 @@ namespace TaskbarShortcuts
 			}
 			listOfApps = tmplist;
 			listboxApplications.ItemsSource = listOfApps;
+
+			listOfApps.CollectionChanged += (sn, ev) =>
+			{
+				if (isInDragDropMode)
+					SaveListOfApplications();
+			};
 
 			//RepopulateAndRefreshJumpList();We cannot do this as we need the window.Handle to be created first
 		}
@@ -308,7 +314,7 @@ namespace TaskbarShortcuts
 
 		private void mainItemBorder_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
 		{
-			if (Keyboard.Modifiers == ModifierKeys.Control)
+			if (Keyboard.Modifiers == ModifierKeys.Control)//Drag the appExe or ChormeAppUrl
 			{
 				ApplicationItem appitem = appItemFromObjectSender(sender);
 				if (appitem == null) return;
@@ -318,6 +324,10 @@ namespace TaskbarShortcuts
 				if (appitem.IsChromeUrlApp_NotPackaged)
 					textToDrag = appitem.GetChromeAppUrlOrId();
 				DragDrop.DoDragDrop(listboxApplications, textToDrag, DragDropEffects.Copy);
+			}
+			else if (Keyboard.Modifiers == ModifierKeys.Alt)
+			{//Alt key down reserved for moving order of items (by drag-drop), see PreviewMouseLeftButtonDown of listbox
+				return;
 			}
 			else
 			{
@@ -374,12 +384,17 @@ namespace TaskbarShortcuts
 		private void Window_PreviewDragOver(object sender, DragEventArgs e)
 		{
 			if (e.Data.GetDataPresent(System.Windows.DataFormats.FileDrop))//We don't check that only ONE FILE is dropped, as we allow multiple and we allow folders too
+			{
+				e.Handled = true;
 				e.Effects = DragDropEffects.Link;
+			}
 			else if (e.Data.GetDataPresent(System.Windows.DataFormats.Text))
+			{
+				e.Handled = true;
 				e.Effects = DragDropEffects.Copy;
+			}
 			else
 				e.Effects = DragDropEffects.None;
-			e.Handled = true;
 		}
 
 		private void Window_PreviewDrop(object sender, DragEventArgs e)
@@ -444,7 +459,17 @@ namespace TaskbarShortcuts
 
 		private void menuitemChromeAppFromClipboardUrl(object sender, RoutedEventArgs e)
 		{
-			ApplicationItem appitem = ApplicationItem.CreateChromeAppFromClipboardUrl(actionOnError);
+			ApplicationItem appitem = ApplicationItem.CreateChromeAppFromClipboardUrl(actionOnError, false);
+			if (appitem == null)
+				return;
+
+			listOfApps.Add(appitem);
+			SaveListOfApplications();
+		}
+
+		private void menuitemChromeIncognitoAppFromClipboardUrl(object sender, RoutedEventArgs e)
+		{
+			ApplicationItem appitem = ApplicationItem.CreateChromeAppFromClipboardUrl(actionOnError, true);
 			if (appitem == null)
 				return;
 
@@ -494,6 +519,81 @@ namespace TaskbarShortcuts
 				SaveListOfApplications();
 			focusedAppValueOnFocus = null;
 		}
+
+		private bool isInDragDropMode = false;
+		private void listboxApplications_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+		{
+			GongSolutions.Wpf.DragDrop.DragDrop.SetIsDragSource(listboxApplications, false);
+			GongSolutions.Wpf.DragDrop.DragDrop.SetIsDropTarget(listboxApplications, false);
+			if (Keyboard.Modifiers == ModifierKeys.Alt)
+			{
+				GongSolutions.Wpf.DragDrop.DragDrop.SetIsDragSource(listboxApplications, true);
+				GongSolutions.Wpf.DragDrop.DragDrop.SetIsDropTarget(listboxApplications, true);
+				isInDragDropMode = true;
+				//e.Handled = true; DO NO Handle, this is left to GongSolutions to handle
+			}
+			/*ListBox parent = listboxApplications;//sender as ListBox;
+			ApplicationItem data = GetObjectDataFromPoint(parent, e.GetPosition(parent)) as ApplicationItem;
+			if (data != null)
+			{
+				DragDrop.DoDragDrop(parent, data, DragDropEffects.Move);
+				e.Handled = true;
+			}
+			ApplicationItem appitem = appItemFromObjectSender(sender);
+			if (appitem == null) return;
+			e.Handled = true;
+			DragDrop.DoDragDrop(listboxApplications, appitem, DragDropEffects.Move);*/
+		}
+
+		private void listboxApplications_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+		{
+			isInDragDropMode = true;
+		}
+
+		/*private void listboxApplications_Drop(object sender, DragEventArgs e)
+		{
+			ListBox parent = sender as ListBox;
+			ApplicationItem data = e.Data.GetData(typeof(ApplicationItem)) as ApplicationItem;
+			ApplicationItem objectToPlaceBefore = GetObjectDataFromPoint(parent, e.GetPosition(parent)) as ApplicationItem;
+			if (data != null && objectToPlaceBefore != null)
+			{
+				int index = listOfApps.IndexOf(objectToPlaceBefore);
+				listOfApps.Remove(data);
+				listOfApps.Insert(index, data);
+				parent.SelectedItem = data;
+				SaveListOfApplications();
+			}
+		}
+
+		private static object GetObjectDataFromPoint(ListBox source, Point point)
+		{
+			UIElement element = source.InputHitTest(point) as UIElement;
+			if (element != null)
+			{
+				object data = DependencyProperty.UnsetValue;
+				while (data == DependencyProperty.UnsetValue)
+				{
+					data = source.ItemContainerGenerator.ItemFromContainer(element);
+					if (data == DependencyProperty.UnsetValue)
+						element = VisualTreeHelper.GetParent(element) as UIElement;
+					if (element == source)
+						return null;
+				}
+				if (data != DependencyProperty.UnsetValue)
+					return data;
+			}
+
+			return null;
+		}
+
+		private void listboxApplications_DragOver(object sender, DragEventArgs e)
+		{
+			if (e.Data.GetDataPresent(typeof(ApplicationItem)))
+			{
+				e.Effects = DragDropEffects.Move;
+				e.Handled = true;
+			}
+		}*/
 	}
 
 	public class ApplicationItem
@@ -555,7 +655,7 @@ namespace TaskbarShortcuts
 				return
 					this.HasArguments()
 					&& Environment.ExpandEnvironmentVariables(this.ApplicationExePath).Equals(GetChromeExePath(), StringComparison.InvariantCultureIgnoreCase)
-					&& this.ApplicationArguments.StartsWith("--app=", StringComparison.InvariantCultureIgnoreCase);
+					&& this.ApplicationArguments.IndexOf("--app=", StringComparison.InvariantCultureIgnoreCase) != -1;
 			}
 		}
 		public bool IsChromeApp { get { return IsChromePackagedAppUrl || IsChromeUrlApp_NotPackaged; } }
@@ -630,7 +730,7 @@ namespace TaskbarShortcuts
 				{
 					if (!newApp.IsChromePackagedAppUrl)
 					{
-						string tmpUri = newApp.ApplicationArguments.Substring("--app=".Length);
+						string tmpUri = newApp.GetChromeAppUrlFromArguments();
 						if (!tmpUri.StartsWith("file:///", StringComparison.InvariantCultureIgnoreCase))
 							newApp.ApplicationName = new Uri(tmpUri).Host;
 						else
@@ -656,7 +756,7 @@ namespace TaskbarShortcuts
 		{
 			return RegistryInterop.GetAppPathFromRegistry("chrome.exe");
 		}
-		public static ApplicationItem CreateChromeAppFromClipboardUrl(Action<string> onError)
+		public static ApplicationItem CreateChromeAppFromClipboardUrl(Action<string> onError, bool incognito = false)
 		{
 			if (onError == null) onError = delegate { };
 
@@ -686,7 +786,7 @@ namespace TaskbarShortcuts
 					return new ApplicationItem(
 						uri.Host,
 						chromeExePath,
-						"--app=" + textWithPossibleUrl,
+						(incognito ? "--incognito " : "") + "--app=" + textWithPossibleUrl,
 						GetOrDownloadFaviconReturnFilepath(textWithPossibleUrl));
 				}
 			}
@@ -827,11 +927,15 @@ namespace TaskbarShortcuts
 		{
 			return Regex.Match(this.ApplicationArguments, @"(?<=\-\-app\-id\=)[^ ]+").ToString();
 		}
+		private string GetChromeAppUrlFromArguments()
+		{
+			return Regex.Match(this.ApplicationArguments, @"(?<=\-\-app\=)[^ ]+").ToString();
+		}
 		public string GetChromeAppUrlOrId()
 		{
-			if (this.ApplicationArguments.StartsWith("--app=", StringComparison.InvariantCultureIgnoreCase))
-				return this.ApplicationArguments.Substring("--app=".Length);
-			else if (this.ApplicationArguments.IndexOf("--app-id=", StringComparison.InvariantCultureIgnoreCase) != -1)
+			if (this.IsChromeUrlApp_NotPackaged)
+				return this.GetChromeAppUrlFromArguments();
+			else if (this.IsChromePackagedAppUrl)
 				return this.GetChromeAppIdFromArguments();
 			else
 				return null;

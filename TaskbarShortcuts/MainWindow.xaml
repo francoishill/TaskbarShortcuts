@@ -3,6 +3,7 @@
 		xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
 		xmlns:System="clr-namespace:System;assembly=mscorlib"
 		xmlns:sharedclasses='clr-namespace:SharedClasses'
+		xmlns:dd='clr-namespace:GongSolutions.Wpf.DragDrop;assembly=GongSolutions.Wpf.DragDrop'
 		Title="MainWindow"
 		Icon='app.ico'
 		Height='108'
@@ -40,6 +41,9 @@
 				<MenuItem Header='Chrome app from Url'
 						  ToolTip='Create a Google Chrome application from url in Clipboard, format = "c:\..chrome.exe --app=http://..."' 
 						  Click='menuitemChromeAppFromClipboardUrl'/>
+				<MenuItem Header='Chrome (incognito) app from Url'
+						  ToolTip='Create a Google Chrome (incognito) application from url in Clipboard, format = "c:\..chrome.exe --incognito --app=http://..."'
+						  Click='menuitemChromeIncognitoAppFromClipboardUrl' />
 			</MenuItem>
 			<Separator />
 			<MenuItem StaysOpenOnClick='True'>
@@ -75,9 +79,13 @@
 		<Grid>
 			<ListBox Name='listboxApplications'
 					 Margin='0 0 0 12'
+					 dd:DragDrop.IsDragSource='True'
+					 dd:DragDrop.IsDropTarget='True'
 					 Background='Transparent'
 					 Foreground='White'
-					 BorderThickness='0'>
+					 BorderThickness='0'
+					 PreviewMouseLeftButtonDown='listboxApplications_PreviewMouseLeftButtonDown'
+					 PreviewMouseLeftButtonUp='listboxApplications_PreviewMouseLeftButtonUp'>
 				<ListBox.Resources>
 					<Style TargetType='ListBoxItem'>
 						<Setter Property='Focusable'
