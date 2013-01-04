@@ -95,6 +95,7 @@
 					<DataTemplate>
 						<Border Name='mainItemBorder'
 								Opacity='0.6'
+								Margin='5'
 								Padding='5 2'
 								Background='#01000000'
 								CornerRadius='5'
@@ -108,6 +109,20 @@
 											  Click='menuitemRemoveFromList_Click' />
 									<MenuItem Header='Open in _explorer'
 											  Click='menuitemOpenInExplorer_Click' />
+									<MenuItem Header='Modify _properties'>
+										<MenuItem>
+											<MenuItem.Header>
+												<DockPanel LastChildFill='True'>
+													<Label Content='Display name'
+														   DockPanel.Dock='Left' />
+													<TextBox Text='{Binding ApplicationName}'
+															 GotFocus='textboxApplicationName_GotFocus'
+															 LostFocus='textboxApplicationName_LostFocus'
+															 Margin='5 0 0 0' />
+												</DockPanel>
+											</MenuItem.Header>
+										</MenuItem>
+									</MenuItem>
 									<Separator />
 									<MenuItem Header='_Copy to Clipboard'>
 										<MenuItem Header='Executable _path'
@@ -125,7 +140,7 @@
 								<TextBlock Text='{Binding ApplicationName}'
 										   Padding='0'
 										   HorizontalAlignment='Center'
-										   FontSize='9'
+										   FontSize='20'
 										   MaxWidth='{DynamicResource cMaxItemWidth}'
 										   TextTrimming='CharacterEllipsis'
 										   Foreground='White' />

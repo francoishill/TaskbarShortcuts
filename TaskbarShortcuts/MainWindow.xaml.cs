@@ -475,6 +475,25 @@ namespace TaskbarShortcuts
 				menuItemSetting_itemMaxWidth.Text = this.Resources[cResourceKeyName_Setting_MaxItemWidth].ToString();
 			}
 		}
+
+		private KeyValuePair<ApplicationItem, string>? focusedAppValueOnFocus;
+		private void textboxApplicationName_GotFocus(object sender, RoutedEventArgs e)
+		{
+			ApplicationItem appitem = appItemFromObjectSender(sender);
+			if (appitem == null) return;
+			focusedAppValueOnFocus = new KeyValuePair<ApplicationItem, string>(appitem, appitem.ApplicationName);
+		}
+
+		private void textboxApplicationName_LostFocus(object sender, RoutedEventArgs e)
+		{
+			ApplicationItem appitem = appItemFromObjectSender(sender);
+			if (appitem == null) return;
+			if (focusedAppValueOnFocus.HasValue
+				&& focusedAppValueOnFocus.Value.Key == appitem
+				&& focusedAppValueOnFocus.Value.Value != appitem.ApplicationName)//The ApplicationName was changed by user
+				SaveListOfApplications();
+			focusedAppValueOnFocus = null;
+		}
 	}
 
 	public class ApplicationItem
@@ -497,7 +516,7 @@ namespace TaskbarShortcuts
 			}
 		}
 
-		public string ApplicationName { get; private set; }
+		public string ApplicationName { get; set; }
 		public string ApplicationExePath { get; private set; }
 		public string ApplicationArguments { get; private set; }
 
