@@ -643,6 +643,52 @@ namespace TaskbarShortcuts
 				File.Move(tmpFilepath, saveIconPath);
 				return saveIconPath;
 			}
+			catch (WebException webexc)
+			{
+				HttpWebResponse httpresp = webexc.Response as HttpWebResponse;
+				if (httpresp == null)//We cannot obtain StatusCode
+				{
+					OnErrorHandler("Failed to download favicon, unknown http status: " + webexc.Message);
+					return null;
+				}
+				if (httpresp.StatusCode != HttpStatusCode.NotFound)
+				{
+					OnErrorHandler("Failed to download favicon, unhandled http status code: " + httpresp.StatusCode);
+					return null;
+				}
+				//We did not find the favicon.ico file online, now try downloading the webpage and extract href="..." inside <link href="..." rel="shorcut icon"/>
+				string tmperr;
+				CookieContainer cookieJar = new CookieContainer();
+				string faviconUrlExtractedInsideLinkShortcutIcon = WebInterop.GetFaviconUrlFromWebpageShortcutIconLink(websiteFullUrl, out tmperr, cookieJar);
+				if (faviconUrlExtractedInsideLinkShortcutIcon == null)
+				{
+					OnErrorHandler(tmperr);
+					return null;
+				}
+				else
+				{//We not have the url to the favicon (extracted from <link href="http://url/to/favicon123.ico" rel="shortcut icon"
+					try
+					{
+						HttpWebRequest req = (HttpWebRequest)HttpWebRequest.Create(faviconUrlExtractedInsideLinkShortcutIcon);
+						req.CookieContainer = cookieJar;
+						var resp = req.GetResponse();
+						using (FileStream tmpfileStream = new FileStream(tmpFilepath, FileMode.Create))
+						{
+							byte[] buffer = new byte[1024];
+							int bytesread;
+							while ((bytesread = resp.GetResponseStream().Read(buffer, 0, buffer.Length)) > 0)
+								tmpfileStream.Write(buffer, 0, bytesread);
+						}
+						File.Move(tmpFilepath, saveIconPath);
+						return saveIconPath;
+					}
+					catch (Exception exc)
+					{
+						OnErrorHandler("Failed to download favicon (extracted its url from webpage): " + exc.Message);
+						return null;
+					}
+				}
+			}
 			catch (Exception exc)
 			{
 				OnErrorHandler("Failed to download favicon: " + exc.Message);
