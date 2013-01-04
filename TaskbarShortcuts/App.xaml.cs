@@ -14,6 +14,7 @@ namespace TaskbarShortcuts
 	{
 		protected override void OnStartup(StartupEventArgs e)
 		{
+			System.Windows.Forms.Application.EnableVisualStyles();
 			SharedClasses.AutoUpdating.CheckForUpdates_ExceptionHandler();
 
 			base.OnStartup(e);

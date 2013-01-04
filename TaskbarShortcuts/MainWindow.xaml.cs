@@ -140,7 +140,7 @@ namespace TaskbarShortcuts
 				{
 					new KeyValuePair<string,IEnumerable<Windows7JumpListsInterop.JumplistItem>>(
 						"App shortcuts",
-						listOfApps.Select(app => new Windows7JumpListsInterop.JumplistItem(Environment.ExpandEnvironmentVariables(app.ApplicationExePath), app.ApplicationName, app.ApplicationArguments, app.IsChromeApp() ? app.GetChromeAppIconFilepath() : null)))
+						listOfApps.Select(app => new Windows7JumpListsInterop.JumplistItem(Environment.ExpandEnvironmentVariables(app.ApplicationExePath), app.ApplicationName, app.ApplicationArguments, app.IsChromeApp ? app.GetChromeAppIconFilepath() : null)))
 				});
 
 			//var _jumpList = JumpList.CreateJumpList();
@@ -232,31 +232,55 @@ namespace TaskbarShortcuts
 			return tmpdict;
 		}*/
 
-		private void DoActionIfObtainedApplicationItemFromSender(object sender, Action<ApplicationItem> action)
+		private ApplicationItem appItemFromObjectSender(object sender)
 		{
 			FrameworkElement fe = sender as FrameworkElement;
-			if (fe == null) return;
+			if (fe == null) return null;
 			ApplicationItem appitem = fe.DataContext as ApplicationItem;
+			return appitem;
+		}
+		private void DoActionIfObtainedApplicationItemFromSender(object sender, Action<ApplicationItem> action)
+		{
+			ApplicationItem appitem = appItemFromObjectSender(sender);
 			if (appitem == null) return;
 			action(appitem);
 		}
 
 		private void mainItemBorder_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
 		{
-			DoActionIfObtainedApplicationItemFromSender(sender, (appitem) =>
+			if (Keyboard.Modifiers == ModifierKeys.Control)
+			{
+				ApplicationItem appitem = appItemFromObjectSender(sender);
+				if (appitem == null) return;
+				e.Handled = true;
+
+				string textToDrag = appitem.ApplicationExePath;
+				if (appitem.IsChromeUrlApp_NotPackaged)
+					textToDrag = appitem.GetChromeAppUrlOrId();
+				DragDrop.DoDragDrop(listboxApplications, textToDrag, DragDropEffects.Copy);
+			}
+			else
 			{
 				e.Handled = true;
-				//Process.Start("explorer", string.Format("/select,\"{0}\"", appitem.ApplicationExePath));
-				try
+				DoActionIfObtainedApplicationItemFromSender(sender, (appitem) =>
 				{
-					appitem.RunCommand();
-					this.Close();
-				}
-				catch (Exception exc)
-				{
-					actionOnError("Error running application: " + exc.Message);
-				}
-			});
+					//Process.Start("explorer", string.Format("/select,\"{0}\"", appitem.ApplicationExePath));
+					try
+					{
+						appitem.RunCommand();
+						this.Close();
+					}
+					catch (Exception exc)
+					{
+						actionOnError("Error running application: " + exc.Message);
+					}
+				});
+			}
+		}
+
+		private void mainItemBorder_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+		{
+
 		}
 
 		private void labelAbout_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -316,8 +340,35 @@ namespace TaskbarShortcuts
 		{
 			DoActionIfObtainedApplicationItemFromSender(sender, (appitem) =>
 			{
-				listOfApps.Remove(appitem);
-				SaveListOfApplications();
+				if (UserMessages.Confirm("Are you sure you want to delete '" + appitem.ApplicationName + "'?"))
+				{
+					listOfApps.Remove(appitem);
+					SaveListOfApplications();
+				}
+			});
+		}
+
+		private void menuitemOpenInExplorer_Click(object sender, RoutedEventArgs e)
+		{
+			DoActionIfObtainedApplicationItemFromSender(sender, (appitem) =>
+			{
+				appitem.OpenInExplorer();
+			});
+		}
+
+		private void menuitemCopyToClipboardExecutablePath_Click(object sender, RoutedEventArgs e)
+		{
+			DoActionIfObtainedApplicationItemFromSender(sender, (appitem) =>
+			{
+				appitem.CopyExecutablePathToClipboard();
+			});
+		}
+
+		private void menuitemCopyToClipboardChromeAppUrl_Click(object sender, RoutedEventArgs e)
+		{
+			DoActionIfObtainedApplicationItemFromSender(sender, (appitem) =>
+			{
+				appitem.CopyChromeAppUrlToClipboard();
 			});
 		}
 
@@ -385,26 +436,51 @@ namespace TaskbarShortcuts
 			if (IconFilePath != null)
 				_applicationicon = GetIconFromFilePath(IconFilePath);
 
-			if (IsChromeApp())
+			if (IsChromeApp)
 				EnsureFaviconExistsAndIsUsed();
 		}
 
-		private bool IsChromePackagedAppUrl()
+		public bool IsChromePackagedAppUrl
 		{
-			return this.HasArguments()
-				&& this.ApplicationArguments.IndexOf("--app-id=", StringComparison.InvariantCultureIgnoreCase) != -1;
+			get
+			{
+				return
+					this.HasArguments()
+					&& Environment.ExpandEnvironmentVariables(this.ApplicationExePath).Equals(GetChromeExePath(), StringComparison.InvariantCultureIgnoreCase)
+					&& this.ApplicationArguments.IndexOf("--app-id=", StringComparison.InvariantCultureIgnoreCase) != -1;
+			}
 		}
-		public bool IsChromeApp()
+		public bool IsChromeUrlApp_NotPackaged
 		{
-			return this.HasArguments()
-				&& Environment.ExpandEnvironmentVariables(this.ApplicationExePath).Equals(GetChromeExePath(), StringComparison.InvariantCultureIgnoreCase)
-				&& (this.ApplicationArguments.StartsWith("--app=", StringComparison.InvariantCultureIgnoreCase)
-				|| this.ApplicationArguments.IndexOf("--app-id=", StringComparison.InvariantCultureIgnoreCase) != -1);
+			get
+			{
+				return
+					this.HasArguments()
+					&& Environment.ExpandEnvironmentVariables(this.ApplicationExePath).Equals(GetChromeExePath(), StringComparison.InvariantCultureIgnoreCase)
+					&& this.ApplicationArguments.StartsWith("--app=", StringComparison.InvariantCultureIgnoreCase);
+			}
 		}
+		public bool IsChromeApp { get { return IsChromePackagedAppUrl || IsChromeUrlApp_NotPackaged; } }
 
 		private static ImageSource GetIconFromFilePath(string filePath)
 		{
-			return IconsInterop.IconExtractor.Extract(filePath, IconsInterop.IconExtractor.IconSize.Large).IconToImageSource();
+			IconsInterop.IconExtractor.IconSize iconSize = IconsInterop.IconExtractor.IconSize.Large;
+			var icon = IconsInterop.IconExtractor.Extract(filePath, iconSize);
+			if (icon == null)
+			{
+				int tmpIconIndex;
+				if (filePath.Contains(",") && int.TryParse(filePath.Split(',')[1], out tmpIconIndex))
+					filePath = filePath.Split(',')[0];
+				else
+					tmpIconIndex = 0;
+				//icon = IconsInterop.IconExtractor.Extract(filePath.Split(',')[0], iconSize, tmpIconIndex);
+
+				if (Directory.Exists(filePath))
+					icon = IconsInterop.IconExtractor.Extract("shell32.dll", iconSize, 3);
+				if (icon == null)
+					return null;
+			}
+			return icon.IconToImageSource();
 		}
 
 		public static ApplicationItem CreateFromFileLinePipeDelimited(string fileLine)
@@ -452,10 +528,19 @@ namespace TaskbarShortcuts
 					Path.GetFileNameWithoutExtension(Environment.ExpandEnvironmentVariables(command_orError)),
 					command_orError,
 					arguments);
-				if (newApp.IsChromeApp())
+				if (newApp.IsChromeApp)
 				{
-					if (!newApp.IsChromePackagedAppUrl())
-						newApp.ApplicationName = new Uri(newApp.ApplicationArguments.Substring("--app=".Length)).Host;
+					if (!newApp.IsChromePackagedAppUrl)
+					{
+						string tmpUri = newApp.ApplicationArguments.Substring("--app=".Length);
+						if (!tmpUri.StartsWith("file:///", StringComparison.InvariantCultureIgnoreCase))
+							newApp.ApplicationName = new Uri(tmpUri).Host;
+						else
+							newApp.ApplicationName =
+								Path.GetFileName(tmpUri.Substring("file:///".Length)
+								.TrimEnd('/', '\\')
+								.Replace('/', '\\'));
+					}
 					else
 					{
 						//newApp.ApplicationName
@@ -519,7 +604,31 @@ namespace TaskbarShortcuts
 
 		private static string GetOrDownloadFaviconReturnFilepath(string websiteFullUrl)
 		{
+			if (websiteFullUrl.StartsWith("file:///", StringComparison.InvariantCultureIgnoreCase))
+			{
+				string fileOrDirPath =
+					websiteFullUrl.Substring("file:///".Length)
+					.TrimEnd('/', '\\')
+					.Replace('/', '\\');
+				if (Directory.Exists(fileOrDirPath))
+				{
+					//First see if we find a favicon.ico in the local directory
+					string localFaviconInDirPath = Path.Combine(fileOrDirPath, "favicon.ico");
+					if (File.Exists(localFaviconInDirPath))
+						return localFaviconInDirPath;
+				}
+
+				string shell32DllPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "SHELL32.dll");
+				return shell32DllPath + ",3";
+			}
+
 			string faviconUrl = WebInterop.GetFaviconUrlFromFullUrl(websiteFullUrl);
+			if (faviconUrl == null)
+			{
+				OnErrorHandler("Could not obtain favicon url from webUrl = " + websiteFullUrl);
+				return null;
+			}
+
 			string saveIconPath = GetFaviconLocalFilepathFromUrl(faviconUrl);
 			if (File.Exists(saveIconPath))
 				return saveIconPath;
@@ -574,16 +683,25 @@ namespace TaskbarShortcuts
 		{
 			return Regex.Match(this.ApplicationArguments, @"(?<=\-\-app\-id\=)[^ ]+").ToString();
 		}
-		public string GetChromeAppIconFilepath()
+		public string GetChromeAppUrlOrId()
 		{
 			if (this.ApplicationArguments.StartsWith("--app=", StringComparison.InvariantCultureIgnoreCase))
+				return this.ApplicationArguments.Substring("--app=".Length);
+			else if (this.ApplicationArguments.IndexOf("--app-id=", StringComparison.InvariantCultureIgnoreCase) != -1)
+				return this.GetChromeAppIdFromArguments();
+			else
+				return null;
+		}
+		public string GetChromeAppIconFilepath()
+		{
+			if (this.IsChromeUrlApp_NotPackaged)
 			{
-				string iconFilepath = GetOrDownloadFaviconReturnFilepath(this.ApplicationArguments.Substring("--app=".Length));
+				string iconFilepath = GetOrDownloadFaviconReturnFilepath(GetChromeAppUrlOrId());
 				return iconFilepath;
 			}
-			else if (this.ApplicationArguments.IndexOf("--app-id=", StringComparison.InvariantCultureIgnoreCase) != -1)
+			else if (this.IsChromePackagedAppUrl)
 			{
-				string appId = this.GetChromeAppIdFromArguments();
+				string appId = GetChromeAppUrlOrId();
 				string iconFilepath = GetIconFilepathForChromeAppId(appId);
 				return iconFilepath;
 			}
@@ -593,7 +711,7 @@ namespace TaskbarShortcuts
 		{
 			string iconFilepath = GetChromeAppIconFilepath();
 			if (iconFilepath != null)
-					_applicationicon = GetIconFromFilePath(iconFilepath);
+				_applicationicon = GetIconFromFilePath(iconFilepath);
 		}
 
 		public void RunCommand()
@@ -605,6 +723,26 @@ namespace TaskbarShortcuts
 				Process.Start(expandedEnvironmentVariablesExePath, this.ApplicationArguments);
 			else
 				Process.Start(expandedEnvironmentVariablesExePath);
+		}
+
+		public void OpenInExplorer()
+		{
+			string fileToSelectInExplorer = this.ApplicationExePath;
+			//if (this.IsChromeApp)
+			//    fileToSelectInExplorer = this.ApplicationArguments;
+			Process.Start("explorer", "/select,\"" + fileToSelectInExplorer + "\"");
+		}
+
+		public void CopyExecutablePathToClipboard()
+		{
+			Clipboard.SetText(this.ApplicationExePath);
+		}
+
+		public void CopyChromeAppUrlToClipboard()
+		{
+			if (!this.IsChromeApp)
+				return;
+			Clipboard.SetText(this.GetChromeAppUrlOrId());
 		}
 	}
 }
