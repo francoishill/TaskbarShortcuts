@@ -188,7 +188,7 @@ namespace TaskbarShortcuts
 					SaveListOfApplications();
 			};
 
-			//RepopulateAndRefreshJumpList();We cannot do this as we need the window.Handle to be created first
+			RepopulateAndRefreshJumpList();
 		}
 
 		private void SaveListOfApplications()
