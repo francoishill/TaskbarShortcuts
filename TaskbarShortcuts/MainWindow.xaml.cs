@@ -19,6 +19,7 @@ using Microsoft.WindowsAPICodePack.Taskbar;
 using System.Reflection;
 using System.Net;
 using System.Text.RegularExpressions;
+using Microsoft.WindowsAPICodePack.Shell;
 
 namespace TaskbarShortcuts
 {
@@ -37,6 +38,7 @@ namespace TaskbarShortcuts
 		private readonly string filepathForApplicationList = SettingsInterop.GetFullFilePathInLocalAppdata("ListOfApplications.txt", cThisAppName);
 		private readonly string filePath_Setting_ItemMaxWidth = SettingsInterop.GetFullFilePathInLocalAppdata("ItemMaxWidth.txt", cThisAppName, "Settings");
 
+		public static List<ApplicationItem> preWindowCreatedList = new List<ApplicationItem>();//This list could have been created in App.xaml.cs
 		ObservableCollection<ApplicationItem> listOfApps;
 
 		public MainWindow()
@@ -180,6 +182,12 @@ namespace TaskbarShortcuts
 					tmplist.Add(ApplicationItem.CreateFromFileLinePipeDelimited(fl));
 			}
 			listOfApps = tmplist;
+			if (preWindowCreatedList != null && preWindowCreatedList.Count > 0)
+			{
+				foreach (var preCreateApp in preWindowCreatedList)
+					listOfApps.Add(preCreateApp);
+				SaveListOfApplications();
+			}
 			listboxApplications.ItemsSource = listOfApps;
 
 			listOfApps.CollectionChanged += (sn, ev) =>
@@ -201,13 +209,37 @@ namespace TaskbarShortcuts
 
 		private void RepopulateAndRefreshJumpList()
 		{
-			Windows7JumpListsInterop.RepopulateAndRefreshJumpList(
+			JumpList jumplist = Windows7JumpListsInterop.RepopulateAndRefreshJumpList(
 				new List<KeyValuePair<string, IEnumerable<Windows7JumpListsInterop.JumplistItem>>>()
 				{
 					new KeyValuePair<string,IEnumerable<Windows7JumpListsInterop.JumplistItem>>(
 						"App shortcuts",
 						listOfApps.Select(app => new Windows7JumpListsInterop.JumplistItem(Environment.ExpandEnvironmentVariables(app.ApplicationExePath), app.ApplicationName, app.ApplicationArguments, app.IsChromeApp ? app.GetChromeAppIconFilepath() : null)))
 				});
+
+			jumplist.AddUserTasks(new JumpListLink(Environment.GetCommandLineArgs()[0], "Request new feature")
+			{
+				Arguments = App.UserTasks.Usertask_RequestNewFeature.ToString(),
+				IconReference = new IconReference("SHELL32.dll", 205)
+			});
+			jumplist.AddUserTasks(new JumpListSeparator());
+			jumplist.AddUserTasks(new JumpListLink(Environment.GetCommandLineArgs()[0], "App from text")
+			{
+				Arguments = App.UserTasks.Usertask_AppFromText.ToString(),
+				IconReference = new IconReference("SHELL32.dll", 70)
+			});
+			jumplist.AddUserTasks(new JumpListLink(Environment.GetCommandLineArgs()[0], "Chrome app from URL")
+			{
+				Arguments = App.UserTasks.Usertask_ChromeAppFromUrl.ToString(),
+				IconReference = new IconReference(ApplicationItem.GetChromeExePath(), 0)
+			});
+
+			jumplist.AddUserTasks(new JumpListLink(Environment.GetCommandLineArgs()[0], "Chrome app (incognito) from URL")
+			{
+				Arguments = App.UserTasks.Usertask_Chrome_IncognitoAppFromUrl.ToString(),
+				IconReference = new IconReference(ApplicationItem.GetChromeExePath(), 4)
+			});
+			jumplist.Refresh();
 
 			//var _jumpList = JumpList.CreateJumpList();
 			//_jumpList.ClearAllUserTasks();
@@ -752,7 +784,7 @@ namespace TaskbarShortcuts
 			}
 		}
 
-		private static string GetChromeExePath()
+		public static string GetChromeExePath()
 		{
 			return RegistryInterop.GetAppPathFromRegistry("chrome.exe");
 		}
