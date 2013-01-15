@@ -330,25 +330,11 @@ namespace TaskbarShortcuts
 			return tmpdict;
 		}*/
 
-		private ApplicationItem appItemFromObjectSender(object sender)
-		{
-			FrameworkElement fe = sender as FrameworkElement;
-			if (fe == null) return null;
-			ApplicationItem appitem = fe.DataContext as ApplicationItem;
-			return appitem;
-		}
-		private void DoActionIfObtainedApplicationItemFromSender(object sender, Action<ApplicationItem> action)
-		{
-			ApplicationItem appitem = appItemFromObjectSender(sender);
-			if (appitem == null) return;
-			action(appitem);
-		}
-
 		private void mainItemBorder_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
 		{
 			if (Keyboard.Modifiers == ModifierKeys.Control)//Drag the appExe or ChormeAppUrl
 			{
-				ApplicationItem appitem = appItemFromObjectSender(sender);
+				ApplicationItem appitem = WPFHelper.GetFromObjectSender<ApplicationItem>(sender);
 				if (appitem == null) return;
 				e.Handled = true;
 
@@ -364,7 +350,7 @@ namespace TaskbarShortcuts
 			else
 			{
 				e.Handled = true;
-				DoActionIfObtainedApplicationItemFromSender(sender, (appitem) =>
+				WPFHelper.DoActionIfObtainedItemFromObjectSender<ApplicationItem>(sender, (appitem) =>
 				{
 					//Process.Start("explorer", string.Format("/select,\"{0}\"", appitem.ApplicationExePath));
 					try
@@ -445,7 +431,7 @@ namespace TaskbarShortcuts
 
 		private void menuitemRemoveFromList_Click(object sender, RoutedEventArgs e)
 		{
-			DoActionIfObtainedApplicationItemFromSender(sender, (appitem) =>
+			WPFHelper.DoActionIfObtainedItemFromObjectSender<ApplicationItem>(sender, (appitem) =>
 			{
 				if (UserMessages.Confirm("Are you sure you want to delete '" + appitem.ApplicationName + "'?"))
 				{
@@ -457,7 +443,7 @@ namespace TaskbarShortcuts
 
 		private void menuitemOpenInExplorer_Click(object sender, RoutedEventArgs e)
 		{
-			DoActionIfObtainedApplicationItemFromSender(sender, (appitem) =>
+			WPFHelper.DoActionIfObtainedItemFromObjectSender<ApplicationItem>(sender, (appitem) =>
 			{
 				appitem.OpenInExplorer();
 			});
@@ -465,7 +451,7 @@ namespace TaskbarShortcuts
 
 		private void menuitemCopyToClipboardExecutablePath_Click(object sender, RoutedEventArgs e)
 		{
-			DoActionIfObtainedApplicationItemFromSender(sender, (appitem) =>
+			WPFHelper.DoActionIfObtainedItemFromObjectSender<ApplicationItem>(sender, (appitem) =>
 			{
 				appitem.CopyExecutablePathToClipboard();
 			});
@@ -473,7 +459,7 @@ namespace TaskbarShortcuts
 
 		private void menuitemCopyToClipboardChromeAppUrl_Click(object sender, RoutedEventArgs e)
 		{
-			DoActionIfObtainedApplicationItemFromSender(sender, (appitem) =>
+			WPFHelper.DoActionIfObtainedItemFromObjectSender<ApplicationItem>(sender, (appitem) =>
 			{
 				appitem.CopyChromeAppUrlToClipboard();
 			});
@@ -536,14 +522,14 @@ namespace TaskbarShortcuts
 		private KeyValuePair<ApplicationItem, string>? focusedAppValueOnFocus;
 		private void textboxApplicationName_GotFocus(object sender, RoutedEventArgs e)
 		{
-			ApplicationItem appitem = appItemFromObjectSender(sender);
+			ApplicationItem appitem = WPFHelper.GetFromObjectSender<ApplicationItem>(sender);
 			if (appitem == null) return;
 			focusedAppValueOnFocus = new KeyValuePair<ApplicationItem, string>(appitem, appitem.ApplicationName);
 		}
 
 		private void textboxApplicationName_LostFocus(object sender, RoutedEventArgs e)
 		{
-			ApplicationItem appitem = appItemFromObjectSender(sender);
+			ApplicationItem appitem = WPFHelper.GetFromObjectSender<ApplicationItem>(sender);
 			if (appitem == null) return;
 			if (focusedAppValueOnFocus.HasValue
 				&& focusedAppValueOnFocus.Value.Key == appitem
