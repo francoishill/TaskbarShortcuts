@@ -217,11 +217,6 @@ namespace TaskbarShortcuts
 						listOfApps.Select(app => new Windows7JumpListsInterop.JumplistItem(Environment.ExpandEnvironmentVariables(app.ApplicationExePath), app.ApplicationName, app.ApplicationArguments, app.IsChromeApp ? app.GetChromeAppIconFilepath() : null)))
 				});
 
-			jumplist.AddUserTasks(new JumpListLink(Environment.GetCommandLineArgs()[0], "Request new feature")
-			{
-				Arguments = App.UserTasks.Usertask_RequestNewFeature.ToString(),
-				IconReference = new IconReference("SHELL32.dll", 205)
-			});
 			jumplist.AddUserTasks(new JumpListSeparator());
 			jumplist.AddUserTasks(new JumpListLink(Environment.GetCommandLineArgs()[0], "App from text")
 			{
@@ -641,7 +636,7 @@ namespace TaskbarShortcuts
 		private ImageSource _applicationicon;
 		public ImageSource ApplicationIcon
 		{
-			get { if (_applicationicon == null) _applicationicon = GetIconFromFilePath(Environment.ExpandEnvironmentVariables(ApplicationExePath)); return _applicationicon; }
+			get { if (_applicationicon == null) _applicationicon = IconsInterop.GetIconFromFilePath(Environment.ExpandEnvironmentVariables(ApplicationExePath)); return _applicationicon; }
 		}
 
 		public ApplicationItem(string ApplicationName, string ApplicationExePath, string ApplicationArguments = null, string IconFilePath = null)
@@ -650,7 +645,7 @@ namespace TaskbarShortcuts
 			this.ApplicationExePath = ApplicationExePath;
 			this.ApplicationArguments = ApplicationArguments;
 			if (IconFilePath != null)
-				_applicationicon = GetIconFromFilePath(IconFilePath);
+				_applicationicon = IconsInterop.GetIconFromFilePath(IconFilePath);
 
 			if (IsChromeApp)
 				EnsureFaviconExistsAndIsUsed();
@@ -677,27 +672,6 @@ namespace TaskbarShortcuts
 			}
 		}
 		public bool IsChromeApp { get { return IsChromePackagedAppUrl || IsChromeUrlApp_NotPackaged; } }
-
-		private static ImageSource GetIconFromFilePath(string filePath)
-		{
-			IconsInterop.IconExtractor.IconSize iconSize = IconsInterop.IconExtractor.IconSize.Large;
-			var icon = IconsInterop.IconExtractor.Extract(filePath, iconSize);
-			if (icon == null)
-			{
-				int tmpIconIndex;
-				if (filePath.Contains(",") && int.TryParse(filePath.Split(',')[1], out tmpIconIndex))
-					filePath = filePath.Split(',')[0];
-				else
-					tmpIconIndex = 0;
-				//icon = IconsInterop.IconExtractor.Extract(filePath.Split(',')[0], iconSize, tmpIconIndex);
-
-				if (Directory.Exists(filePath))
-					icon = IconsInterop.IconExtractor.Extract("shell32.dll", iconSize, 3);
-				if (icon == null)
-					return null;
-			}
-			return icon.IconToImageSource();
-		}
 
 		public static ApplicationItem CreateFromFileLinePipeDelimited(string fileLine)
 		{
@@ -977,7 +951,7 @@ namespace TaskbarShortcuts
 		{
 			string iconFilepath = GetChromeAppIconFilepath();
 			if (iconFilepath != null)
-				_applicationicon = GetIconFromFilePath(iconFilepath);
+				_applicationicon = IconsInterop.GetIconFromFilePath(iconFilepath);
 		}
 
 		public void RunCommand()

@@ -14,12 +14,15 @@ namespace TaskbarShortcuts
 	/// </summary>
 	public partial class App : Application
 	{
-		public enum UserTasks { Usertask_RequestNewFeature, Usertask_AppFromText, Usertask_ChromeAppFromUrl, Usertask_Chrome_IncognitoAppFromUrl };//These UserTasks are added to the Windows 7 JumpList
+		public enum UserTasks { Usertask_AppFromText, Usertask_ChromeAppFromUrl, Usertask_Chrome_IncognitoAppFromUrl };//These UserTasks are added to the Windows 7 JumpList
 
 		protected override void OnStartup(StartupEventArgs e)
 		{
 			System.Windows.Forms.Application.EnableVisualStyles();
 			SharedClasses.AutoUpdating.CheckForUpdates_ExceptionHandler();
+
+			//int a = 0;
+			//var b = a / a;
 
 			//UserMessages.ShowInfoMessage(Environment.CommandLine);
 			string[] args = Environment.GetCommandLineArgs();
@@ -36,11 +39,6 @@ namespace TaskbarShortcuts
 						ApplicationItem app = null;
 						switch (ut)
 						{
-							case UserTasks.Usertask_RequestNewFeature:
-								string newFeatureDescription = InputBoxWPF.Prompt("Please enter a description for the new feature", "New feature request");
-								if (newFeatureDescription != null)
-									DeveloperCommunication.RunMailto("Request a new feature", newFeatureDescription);
-								break;
 							case UserTasks.Usertask_AppFromText:
 								app = ApplicationItem.CreateFromClipboardText(err => UserMessages.ShowErrorMessage(err));
 								if (app != null)
